@@ -393,7 +393,7 @@
             return encodeURIComponent(body);
         }
 
-        // '보고서 보내기' 버튼에 연결된 함수
+        // 'Report' 버튼에 연결된 함수
         function sendReport() {
             const data = collectData();
             if (!data.date) {
@@ -408,7 +408,7 @@
             const mailtoLink = `mailto:${RECIPIENT_EMAIL}?subject=${subject}&body=${emailBody}`;
             window.location.href = mailtoLink;
             
-            alert("직원의 기본 이메일 프로그램이 열립니다. 내용을 확인하고 '보내기(Send)' 버튼을 눌러야 보고서가 전송됩니다.");
+            alert("Your default email program will open. Please review the content and press the 'Send' button to send the report.");
         }
 
         // **제거된 함수**: saveData(), loadData() - 로컬 저장 기능은 모두 제거되었습니다.
@@ -531,4 +531,5 @@
 
     </script>
 </body>
+
 </html>
