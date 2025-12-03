@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Sales Report</title>
+    <style>
+        :root {
+            --bg-color: #f4f4f9;
+            --primary-color: #007bff;
+            --card-bg: #ffffff;
+            --border-color: #ddd;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 10px;
+            padding-bottom: 70px; /* Space for the fixed button bar */
+        }
+
+        h1, h2, h3 { margin: 0; padding: 0; }
+        
+        /* Card Styles */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .card-header h2 { font-size: 1.1rem; color: #333; }
+
+        /* General Input Styles */
+        input[type="date"], input[type="number"], input[type="text"], select, textarea {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        /* Sales Log Table */
+        .sales-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .sales-table th, .sales-table td {
+            padding: 4px 2px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .sales-table th { background-color: #f8f9fa; color: #555; font-weight: 600; }
+        
+        .sales-table input, .sales-table select {
+            border: none;
+            padding: 4px;
+            font-size: 0.9rem;
+            width: 100%;
+            text-align: left;
+        }
+        
+        /* Specific Column Widths */
+        .sales-table td:nth-child(1) { width: 25%; } /* Time */
+        .sales-table td:nth-child(2) { width: 35%; } /* TG/BT Type */
+        .sales-table td:nth-child(3) { width: 40%; } /* Sales Amount */
+
+        /* Add Row Button */
+        .add-row-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        /* Expense Log Styles */
+        .expense-inputs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .expense-list-table { width: 100%; margin-top: 10px; }
+        .expense-list-table td.amount { text-align: right; font-weight: bold; }
+        .del-btn { color: red; cursor: pointer; border: none; background: none; font-size: 1.2rem; }
+
+        /* Settlement Summary Styles */
+        .settlement-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed #ddd;
+        }
+        .settlement-row input[type="number"], .settlement-row span.amount-display {
+            width: 100px; 
+            padding: 5px; 
+            text-align: right;
+            font-weight: bold;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .settlement-row span.amount-display {
+            border: none;
+            background-color: transparent;
+            font-size: 1rem;
+        }
+
+        .settlement-row.total {
+            border-top: 2px solid #333;
+            border-bottom: none;
+            margin-top: 5px;
+            padding-top: 10px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .highlight { color: var(--primary-color); }
+        
+        /* Total Sales Highlight */
+        #grandTotal { 
+            background-color: #ffc107; /* Yellow */
+            border-radius: 4px;
+            padding: 5px 8px;
+            color: #333; 
+        }
+
+        .currency-label { margin-left: 5px; font-weight: normal; font-size: 0.9rem;}
+
+        /* Note Area */
+        #noteArea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        /* Fixed Action Bar (SEND BUTTON) - 🔥 버튼 하나만 남도록 수정 완료 */
+        .fixed-action-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            background-color: #ffffff;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            z-index: 1000;
+            /* 기존 flex-grow 제거 */
+        }
+
+        .action-btn {
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 90%; 
+            font-size: 1.0rem;
+        }
+
+        .send-btn { background-color: #007bff; }
+    </style>
+</head>
+<body onload="initializeForm(true)">
+    
+    <div class="card">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <label for="reportDate" style="font-weight: bold; white-space: nowrap; margin-right: 10px;">Report Date</label>
+            <input type="date" id="reportDate" onchange="calculateSettlement()"> 
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>💰 TG/BT Sales Log</h2>
+        </div>
+        
+        <table class="sales-table">
+            <thead>
+                <tr>
+                    <th>Time (24H)</th>
+                    <th>TG/BT Type</th>
+                    <th>Sales Amount (RM)</th>
+                </tr>
+            </thead>
+            <tbody id="salesTableBody">
+                </tbody>
+        </table>
+
+        <button class="add-row-btn" onclick="addSalesRow()">Add Row</button>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>💸 Use of CASH</h2>
+        </div>
+        <div class="expense-inputs">
+            <input type="text" id="expenseItem" placeholder="Item" style="flex: 1;">
+            <input type="number" id="expenseAmount" placeholder="Total Price" style="width: 80px;">
+            <button class="add-btn" onclick="addExpense()">Add</button>
+        </div>
+
+        <table class="expense-list-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th style="text-align:right;">Total Price (RM)</th>
+                    <th style="width:30px;"></th>
+                </tr>
+            </thead>
+            <tbody id="expenseList">
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card" style="border: 2px solid #007bff;">
+        <div class="card-header">
+            <h2>📊 Settlement</h2>
+        </div>
+        
+        <h3>Sales Summary</h3>
+        
+        <div class="settlement-row">
+            <span>CARD</span> 
+            <input type="number" id="totalCardInput" placeholder="RM" oninput="calculateSettlement()">
+        </div>
+        <div class="settlement-row">
+            <span>TG/BT</span> 
+            <input type="number" id="totalTransferInput" placeholder="RM" oninput="calculateSettlement()">
+        </div>
+        <div class="settlement-row">
+            <span>CASH</span> 
+            <input type="number" id="totalCashSalesInput" placeholder="RM" oninput="calculateSettlement()">
+        </div>
+        
+        <div class="settlement-row total">
+            <span>Total Sales</span> 
+            <span id="grandTotal" class="amount-display highlight">RM 0</span>
+        </div>
+
+        <br>
+        
+        <h3>Total Cash History</h3>
+        <div class="settlement-row">
+            <span>Yesterday ( ) Remained</span>
+            <input type="number" id="prevCashInput" placeholder="RM" value="0" oninput="calculateSettlement()">
+        </div>
+        <div class="settlement-row">
+            <span>+Today Sales</span>
+            <input type="number" id="todayCashSalesInput" placeholder="RM" oninput="calculateSettlement()">
+        </div>
+        <div class="settlement-row">
+            <span>-Today use</span> 
+            <input type="number" id="todayCashUseInput" placeholder="RM" oninput="calculateSettlement()">
+        </div>
+        
+        <div class="settlement-row total">
+            <span>Today ( ) Cash Total</span> 
+            <span id="finalCashTotal" class="amount-display highlight">RM 0</span>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>📝 Note</h2>
+        </div>
+        <textarea id="noteArea" placeholder="Note"></textarea> 
+    </div>
+
+    <div class="fixed-action-bar">
+        <button class="action-btn send-btn" onclick="sendReport()">📧 보고서 보내기</button>
+    </div>
+
+    <script>
+        // --- Data Variables for Expenses ---
+        let expenseData = [];
+        const SALES_TABLE_BODY = document.getElementById('salesTableBody');
+        const INITIAL_ROWS = 5;
+        // **수신자 이메일 주소**
+        const RECIPIENT_EMAIL = "ziyeon0609@gmail.com";
+
+        // ===================================
+        // 1. Data Collection & Email Submission
+        // ===================================
+        
+        function collectData() {
+            const dateKey = document.getElementById('reportDate').value;
+
+            const salesLogData = [];
+            const salesRows = SALES_TABLE_BODY.querySelectorAll('tr');
+            salesRows.forEach(row => {
+                const timeElement = row.querySelector('.sales-time');
+                const typeElement = row.querySelector('.sales-type');
+                const amountElement = row.querySelector('.sales-amount');
+                
+                if (timeElement && typeElement && amountElement) {
+                    if (timeElement.value || amountElement.value) {
+                         salesLogData.push({
+                            time: timeElement.value,
+                            type: typeElement.value,
+                            amount: amountElement.value
+                        });
+                    }
+                }
+            });
+
+            calculateSettlement();
+
+            return {
+                date: dateKey,
+                salesLog: salesLogData,
+                expenseLog: expenseData,
+                cardTotal: document.getElementById('totalCardInput').value,
+                transferTotal: document.getElementById('totalTransferInput').value,
+                cashSalesTotal: document.getElementById('totalCashSalesInput').value,
+                prevCash: document.getElementById('prevCashInput').value,
+                todayCashSales: document.getElementById('todayCashSalesInput').value,
+                todayCashUse: document.getElementById('todayCashUseInput').value,
+                note: document.getElementById('noteArea').value,
+                grandTotal: document.getElementById('grandTotal').innerText,
+                finalCashTotal: document.getElementById('finalCashTotal').innerText
+            };
+        }
+
+        // 데이터를 이메일 본문용 텍스트로 변환
+        function formatDataForEmail(data) {
+            let body = `[일일 매출 보고서] - 날짜: ${data.date || '날짜 미입력'}\n\n`;
+            
+            // 1. Sales Log
+            body += "===================================\n";
+            body += "1. TG/BT Sales Log\n";
+            body += "===================================\n";
+            if (data.salesLog.length > 0) {
+                data.salesLog.forEach(item => {
+                    body += `[${item.time || 'Time'}] ${item.type || 'Type'}: RM ${item.amount || '0'}\n`;
+                });
+            } else {
+                body += "No sales recorded.\n";
+            }
+
+            // 2. Expense Log
+            body += "\n===================================\n";
+            body += "2. Use of CASH (Expense)\n";
+            body += "===================================\n";
+            if (data.expenseLog.length > 0) {
+                data.expenseLog.forEach(item => {
+                    body += `- ${item.item}: RM ${item.amount.toLocaleString()}\n`;
+                });
+            } else {
+                body += "No expenses recorded.\n";
+            }
+
+            // 3. Settlement Summary
+            body += "\n===================================\n";
+            body += "3. Settlement Summary\n";
+            body += "===================================\n";
+            body += `CARD: RM ${data.cardTotal || '0'}\n`;
+            body += `TG/BT: RM ${data.transferTotal || '0'}\n`;
+            body += `CASH Sales: RM ${data.cashSalesTotal || '0'}\n`;
+            body += `-----------------------------------\n`;
+            body += `**TOTAL SALES**: ${data.grandTotal || 'RM 0'}\n`;
+
+            // 4. Total Cash History
+            body += "\n===================================\n";
+            body += "4. Total Cash History\n";
+            body += "===================================\n";
+            body += `Yesterday Remained: RM ${data.prevCash || '0'}\n`;
+            body += `+Today Cash Sales: RM ${data.todayCashSales || '0'}\n`;
+            body += `-Today Cash Use: RM ${data.todayCashUse || '0'}\n`;
+            body += `-----------------------------------\n`;
+            body += `**TODAY FINAL CASH**: ${data.finalCashTotal || 'RM 0'}\n`;
+
+            // 5. Note
+            body += "\n===================================\n";
+            body += "5. Note\n";
+            body += "===================================\n";
+            body += (data.note || "No note.");
+            
+            return encodeURIComponent(body);
+        }
+
+        // '보고서 보내기' 버튼에 연결된 함수
+        function sendReport() {
+            const data = collectData();
+            if (!data.date) {
+                alert("Please select the Report Date first.");
+                return;
+            }
+            
+            const emailBody = formatDataForEmail(data);
+            const subject = encodeURIComponent(`Daily Sales Report - ${data.date}`);
+            
+            // mailto 링크 생성 및 실행 (사용자의 이메일 클라이언트 실행)
+            const mailtoLink = `mailto:${RECIPIENT_EMAIL}?subject=${subject}&body=${emailBody}`;
+            window.location.href = mailtoLink;
+            
+            alert("직원의 기본 이메일 프로그램이 열립니다. 내용을 확인하고 '보내기(Send)' 버튼을 눌러야 보고서가 전송됩니다.");
+        }
+
+        // **제거된 함수**: saveData(), loadData() - 로컬 저장 기능은 모두 제거되었습니다.
+
+        // ===================================
+        // 2. TG/BT Sales Log (Editable Table)
+        // ===================================
+
+        function createSalesRow(time = '', type = 'TG', amount = '') { 
+            const newRow = SALES_TABLE_BODY.insertRow();
+            
+            const cellTime = newRow.insertCell();
+            cellTime.innerHTML = `<input type="text" 
+                                        class="sales-time" 
+                                        placeholder="HH:MM (24H)" 
+                                        value="${time}"
+                                        pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$">`;
+
+            const cellType = newRow.insertCell();
+            cellType.innerHTML = `
+                <select class="sales-type" value="${type}">
+                    <option value="TG" ${type === 'TG' ? 'selected' : ''}>TG</option>
+                    <option value="BT" ${type === 'BT' ? 'selected' : ''}>BT</option>
+                </select>`;
+            
+            const cellAmount = newRow.insertCell();
+            cellAmount.innerHTML = `<input type="number" class="sales-amount" placeholder="RM" value="${amount}" oninput="calculateSettlement()">`;
+        }
+
+        function initializeSalesTable() {
+            for (let i = 0; i < INITIAL_ROWS; i++) {
+                createSalesRow();
+            }
+        }
+
+        function addSalesRow() {
+            createSalesRow();
+        }
+
+        // ===================================
+        // 3. Expense Log (Dynamic List)
+        // ===================================
+
+        function addExpense() {
+            const itemInput = document.getElementById('expenseItem');
+            const amountInput = document.getElementById('expenseAmount');
+            const item = itemInput.value;
+            const amount = Number(amountInput.value);
+
+            if(!item || amount <= 0) return alert("Please enter item and amount.");
+
+            expenseData.push({ item, amount, id: Date.now() });
+
+            itemInput.value = '';
+            amountInput.value = '';
+            renderExpenses();
+        }
+
+        function renderExpenses() {
+            const list = document.getElementById('expenseList');
+            list.innerHTML = "";
+            expenseData.forEach((exp, index) => {
+                list.innerHTML += `
+                    <tr>
+                        <td>${exp.item}</td>
+                        <td class="amount">${exp.amount.toLocaleString()}</td>
+                        <td style="text-align:center;"><button class="del-btn" onclick="removeExpense(${index})">×</button></td>
+                    </tr>`;
+            });
+            calculateSettlement(); 
+        }
+
+        function removeExpense(index) {
+            expenseData.splice(index, 1);
+            renderExpenses();
+        }
+
+        // ===================================
+        // 4. Settlement Calculation (Core Logic - Manual Input Focus)
+        // ===================================
+        
+        function calculateSettlement() {
+            const cardTotal = Number(document.getElementById('totalCardInput').value) || 0;
+            const transferTotal = Number(document.getElementById('totalTransferInput').value) || 0;
+            const cashSalesTotal = Number(document.getElementById('totalCashSalesInput').value) || 0;
+
+            const grandTotal = cardTotal + transferTotal + cashSalesTotal;
+
+            const prevCash = Number(document.getElementById('prevCashInput').value) || 0;
+            const todayCashSales = Number(document.getElementById('todayCashSalesInput').value) || 0;
+            const todayCashUse = Number(document.getElementById('todayCashUseInput').value) || 0;
+            
+            const finalCash = prevCash + todayCashSales - todayCashUse;
+
+            document.getElementById('grandTotal').innerText = "RM " + grandTotal.toLocaleString();
+            document.getElementById('finalCashTotal').innerText = "RM " + finalCash.toLocaleString();
+        }
+        
+        // 마스터 초기화 함수 (loadData 대신 사용)
+        function initializeForm(isInitialLoad) {
+            if (isInitialLoad) {
+                document.getElementById('reportDate').valueAsDate = new Date();
+            }
+
+            SALES_TABLE_BODY.innerHTML = "";
+            expenseData = [];
+            renderExpenses();
+            
+            document.getElementById('totalCardInput').value = '';
+            document.getElementById('totalTransferInput').value = '';
+            document.getElementById('totalCashSalesInput').value = '';
+            document.getElementById('prevCashInput').value = '0';
+            document.getElementById('todayCashSalesInput').value = '';
+            document.getElementById('todayCashUseInput').value = '';
+            document.getElementById('noteArea').value = '';
+
+            initializeSalesTable();
+            calculateSettlement();
+        }
+
+    </script>
+</body>
+</html>
